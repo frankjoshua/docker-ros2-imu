@@ -1,49 +1,37 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import Float32
+import serial
+import json
 
-class ExampleNode(Node):
+class IMUNode(Node):
     def __init__(self):
-        super().__init__('example_node')
-        
-        # Create a subscriber to the 'string_topic'
-        self.subscription = self.create_subscription(
-            String,
-            'string_topic',
-            self.listener_callback,
-            10
-        )
-
-        # Create a publisher to the 'output_string_topic'
-        self.publisher = self.create_publisher(
-            String,
-            'output_string_topic',
-            10
-        )
-
-        # Initialize the last received message with a default value
-        self.last_received_string = "No message received yet!"
-
-        # Create a timer that triggers every 2 seconds
-        self.timer = self.create_timer(2.0, self.timer_callback)
-        
-        self.get_logger().info('Node has started and is listening for strings on "string_topic" and publishing to "output_string_topic".')
-
-    def listener_callback(self, msg):
-        # Update the last received string whenever a new message is received
-        self.last_received_string = msg.data
+        super().__init__('imu_node')
+        self.publisher_ = self.create_publisher(Float32, 'heading', 10)
+        self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.get_logger().info("Ready")
 
     def timer_callback(self):
-        # Publish the last received string every 2 seconds
-        msg = String()
-        msg.data = self.last_received_string
-        self.publisher.publish(msg)
-        self.get_logger().info(f'Published: {msg.data}')
-
+        try:
+            if self.serial_port.in_waiting > 0:
+                line = self.serial_port.readline().decode('utf-8').strip()
+                data = json.loads(line)
+                self.get_logger().info(f'Data: {json.dumps(data)}')
+                if 'heading' in data:
+                    msg = Float32()
+                    msg.data = float(data['heading'])
+                    self.publisher_.publish(msg)
+                    self.get_logger().info(f'Publishing: {msg.data}')
+        except Exception as e:
+            self.get_logger().error(f'Error reading from serial port: {str(e)}')
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ExampleNode()
-    rclpy.spin(node)
-    node.destroy_node()
+    imu_node = IMUNode()
+    rclpy.spin(imu_node)
+    imu_node.destroy_node()
     rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
