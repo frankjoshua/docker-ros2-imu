@@ -10,7 +10,7 @@ RUN apt-get update \
    && apt-get autoremove -y \
    && apt-get clean -y \
    && rm -rf /var/lib/apt/lists/*
-RUN pip3 install --break-system-packages pyserial
+RUN pip3 install pyserial
 ENV DEBIAN_FRONTEND=dialog
 
 WORKDIR /root
